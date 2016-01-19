@@ -8,8 +8,3 @@ type BusConnection interface {
 	Request(message Message, res interface{}) error
 	ServiceNameIsSet() bool
 }
-
-type BusSubscription struct {
-	SubscriptionId string // unique id, used to unsubscribe
-	Messages       chan *Message
-}
