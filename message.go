@@ -1,5 +1,9 @@
 package hub
 
+import (
+	"github.com/pborman/uuid"
+)
+
 type Message struct {
 	ID         string
 	Topic      string
@@ -13,7 +17,27 @@ type Payload struct {
 	Data  []byte `json:"data"`
 }
 
-func NewMessage(topic Topic, req interface{}) Message {
-	// return Message{topic.String(), request}
-	return Message{}
+func NewReqMessage(topic Topic, req interface{}, serializer BusSerializer, withReply bool) (*Message, error) {
+	// reply string
+	reply := ""
+	if withReply {
+		reply = topic.ResUnique()
+	}
+
+	// encode request
+	b, err := serializer.Serialize(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Message{
+		ID:        uuid.New(),
+		Topic:     topic,
+		Reply:     reply,
+		IsReponse: false,
+		Payload: Payload{
+			Error: "",
+			Data:  b,
+		},
+	}
 }
