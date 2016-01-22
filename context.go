@@ -1,8 +1,8 @@
 package hub
 
 type Context struct {
-	Message    *Message
-	Connection *BusConnection
+	Message *Message
+	Bus     *Bus
 }
 
 // Binds the payload to the provided data store.

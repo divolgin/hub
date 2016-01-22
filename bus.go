@@ -1,13 +1,19 @@
 package hub
 
 import (
-// "github.com/pborman/uuid"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/pborman/uuid"
 )
 
 type Bus struct {
-	Connection    BusConnection
-	serializer    BusSerializer
-	subscriptions []*Subscription
+	Connection        BusConnection
+	serializer        BusSerializer
+	subscriptionsLock sync.RWMutex
+	subscriptions     map[string]*Subscription
+	DefaultTimeout    time.Duration
 }
 
 func NewBus(bc BusConnection, format SerializationFormat) *Bus {
@@ -17,31 +23,51 @@ func NewBus(bc BusConnection, format SerializationFormat) *Bus {
 	}
 }
 
-// ListenRequest will subscribe to the given topic response, and invoke
-// the handler when messages are received. Processs of the same service
-// listening to the same topic will all receive every message.
-func (b *Bus) ListenResponse(topic TopicResponse, handle MessageHandler) error {
-
-}
-
-// HandleRequest will subscribe to the given topic request, and
-// invoke the handler when messages are received. Processes of the same
-// service listening to same topic will be have requests round robbined between
-// the group.
-func (b *Bus) HandleRequest(topic TopicRequest, handler MessageHandler) error {}
-
 // Request will publish a request to the provided topic and wait for a response.
 // If the request produces an error, an error will be returned.
-func (b *Bus) Request(topic TopicRequest, req, res interface{}) error {
-	return nil
+func (b *Bus) Request(topic Topic, req, res interface{}) error {
+	msg, err := NewRequestMessage(topic.Req().String(), topic.ResUnique().String(), req, true, b.serializer)
+	if err != nil {
+		return err
+	}
+
+	// subscribe to response
+	sub, err := b.Connection.Subscribe(msg.Reply)
+	if err != nil {
+		return err
+	}
+	defer func(sub *Subscription) {
+		b.Unsubscribe(sub.ID)
+	}(sub)
+
+	// send request
+	err := b.Connection.Publish(msg)
+	if err != nil {
+		return err
+	}
+
+	// get response or timeout
+	select {
+	case msg := <-sub.Messages:
+		if len(msg.Payload.Error) > 0 {
+			return fmt.Errorf(msg.Payload.Error)
+		}
+		err := b.serializer.Deserialize(msg.Payload.Data, res)
+		if err != nil {
+			return fmt.Errorf("Error deserializing response: %s", err.Error())
+		}
+		return nil
+	case <-time.After(b.DefaultTimeout):
+		return fmt.Errorf("Request timed out")
+	}
 }
 
 // Subscribe will invoke the provided handler with messages directed towards
 // the provided topic
 func (b *Bus) Subscribe(topic Topic, handler MessageHandler) (string, error) {
-	sub, err := b.Connection.Subscribe()
+	sub, err := b.Connection.Subscribe(topic.String())
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	go func() {
@@ -54,21 +80,19 @@ func (b *Bus) Subscribe(topic Topic, handler MessageHandler) (string, error) {
 		}
 	}()
 
-	b.subscriptions = append(b.subscriptions, &subscription{
-		id:      sub.SubscriptionId,
-		subject: messageSubject,
-		uuid:    uuid.New(),
-		handler: handler,
-	})
+	// save subscription in map
+	b.subscriptionsLock.Lock()
+	b.subscriptions[sub.ID] = sub
+	b.subscriptionsLock.Unlock()
 
 	// return sub.SubscriptionId
-	return "", nil
+	return sub.ID, nil
 }
 
 // Publish the request to the provided topic.
 // This method does not wait for a response, it is fire and forget.
 func (b *Bus) Publish(topic Topic, req interface{}) error {
-	msg, err := NewReqMessage(topic.String(), req, b.serializer, false)
+	msg, err := NewRequestMessage(topic.Req(), "", req, false, b.serializer)
 	if err != nil {
 		return err
 	}
@@ -80,4 +104,11 @@ func (b *Bus) Publish(topic Topic, req interface{}) error {
 // provided subscriptions ids.
 func (b *Bus) Unsubscribe(subscriptionIDs ...string) {
 	b.Connection.Unsubscribe(subscriptionIDs...)
+
+	// delete from sub map
+	b.subscriptionsLock.Lock()
+	for _, subID := range subscriptionIDs {
+		delete(b.subscriptions[subID])
+	}
+	b.subscriptionsLock.Unlock()
 }

@@ -17,15 +17,8 @@ type Payload struct {
 	Data  []byte `json:"data"`
 }
 
-func NewReqMessage(topic Topic, req interface{}, serializer BusSerializer, withReply bool) (*Message, error) {
-	// reply string
-	reply := ""
-	if withReply {
-		reply = topic.ResUnique()
-	}
-
-	// encode request
-	b, err := serializer.Serialize(req)
+func NewRequestMessage(topic, reply string, req interface{}, withReply bool, serializer BusSerializer) (*Message, error) {
+	data, err := serializer.Serialize(req)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +30,7 @@ func NewReqMessage(topic Topic, req interface{}, serializer BusSerializer, withR
 		IsReponse: false,
 		Payload: Payload{
 			Error: "",
-			Data:  b,
+			Data:  data,
 		},
 	}
 }
