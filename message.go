@@ -17,20 +17,14 @@ type Payload struct {
 	Data  []byte `json:"data"`
 }
 
-func NewRequestMessage(topic, reply string, req interface{}, withReply bool, serializer BusSerializer) (*Message, error) {
-	data, err := serializer.Serialize(req)
-	if err != nil {
-		return nil, err
+func NewDefaultMessage(opts ...func(m *Message)) *Message {
+	msg := &Message{
+		ID: uuid.New(),
 	}
 
-	return &Message{
-		ID:        uuid.New(),
-		Topic:     topic,
-		Reply:     reply,
-		IsReponse: false,
-		Payload: Payload{
-			Error: "",
-			Data:  data,
-		},
+	for _, f := range opts {
+		f(msg)
 	}
+
+	return msg
 }

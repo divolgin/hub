@@ -175,3 +175,7 @@ func (nc *Connection) GetNumActiveSubscriptions() int {
 func (nc *Connection) GetReconnectNotifyChan() chan bool {
 	return nc.ReconnectChan
 }
+
+func (nc *Connection) ServiceNameIsSet() bool {
+	return len(nc.Config.Service) > 0
+}
