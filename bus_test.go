@@ -93,7 +93,6 @@ func TestRequestError(t *testing.T) {
 	}(subID)
 
 	// publish
-	println("requesting")
 	var res Envelope
 	if err := bus.Request(topic, req, &res); err == nil {
 		t.Fatalf("Expected error")
@@ -111,7 +110,7 @@ func TestPublish(t *testing.T) {
 	done := make(chan struct{})
 
 	// subscribe
-	subID, err := bus.Subscribe(topic.Req(), func(c *hub.Context) {
+	subID, err := bus.Subscribe(topic, func(c *hub.Context) {
 		var data Envelope
 		if err := c.Bind(&data); err != nil {
 			t.Fatalf("error binding request: %s", err.Error())
@@ -153,7 +152,7 @@ func TestListenRequest(t *testing.T) {
 	// create 3 listeners
 	i := numListeners
 	for i > 0 {
-		subID, err := bus.Listen(topic.Req(), func(c *hub.Context) {
+		subID, err := bus.Listen(topic, func(c *hub.Context) {
 			var data Envelope
 			if err := c.Bind(&data); err != nil {
 				t.Fatalf("error binding request: %s", err.Error())

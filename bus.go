@@ -97,7 +97,7 @@ func (b *Bus) Subscribe(topic Topic, handler MessageHandler) (string, error) {
 	return sub.ID, nil
 }
 
-// Listen will invode the provided handler with messages directed towards
+// Listen will invoke the provided handler with messages directed towards
 // the provided topic. Nodes of the same service will all receive each
 // incoming message.
 func (b *Bus) Listen(topic Topic, handler MessageHandler) (string, error) {
@@ -137,7 +137,7 @@ func (b *Bus) Publish(topic Topic, req interface{}) error {
 		return err
 	}
 	msg := NewDefaultMessage(func(m *Message) {
-		m.Topic = topic.Req().String()
+		m.Topic = topic.String()
 		m.Reply = ""
 		m.IsResponse = false
 		m.Payload.Data = data

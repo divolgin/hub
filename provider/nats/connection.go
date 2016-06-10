@@ -2,6 +2,7 @@ package nats
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/apcera/nats"
@@ -43,6 +44,8 @@ type Connection struct {
 	Connection    *nats.EncodedConn
 	Subscriptions map[string]*Subscription
 	ReconnectChan chan bool
+
+	subscriptionsLock *sync.Mutex
 }
 
 type Subscription struct {
@@ -82,10 +85,11 @@ func NewConnection(url string, config *Config) (*Connection, error) {
 
 	// wrap
 	natsConn := &Connection{
-		Config:        config,
-		Connection:    ec,
-		Subscriptions: make(map[string]*Subscription),
-		ReconnectChan: reconnectChan,
+		Config:            config,
+		Connection:        ec,
+		Subscriptions:     make(map[string]*Subscription),
+		ReconnectChan:     reconnectChan,
+		subscriptionsLock: &sync.Mutex{},
 	}
 	return natsConn, nil
 }
@@ -107,6 +111,9 @@ func (nc *Connection) Listen(subject string) (*hub.Subscription, error) {
 	}
 
 	// store and return
+	nc.subscriptionsLock.Lock()
+	defer nc.subscriptionsLock.Unlock()
+
 	subID := uuid.New()
 	nc.Subscriptions[subID] = &Subscription{
 		MsgChan:      msgChan,
@@ -132,6 +139,9 @@ func (nc *Connection) Subscribe(subject string) (*hub.Subscription, error) {
 	}
 
 	// store and return
+	nc.subscriptionsLock.Lock()
+	defer nc.subscriptionsLock.Unlock()
+
 	subID := uuid.New()
 	nc.Subscriptions[subID] = &Subscription{
 		MsgChan:      msgChan,

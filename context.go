@@ -14,6 +14,11 @@ func (c *Context) Bind(receiver interface{}) error {
 	return c.bus.serializer.Deserialize(c.message.Payload.Data, receiver)
 }
 
+// GetPayload returns the raw bytes of the context
+func (c *Context) GetPayload() []byte {
+	return c.message.Payload.Data
+}
+
 // Responds using the reply inbox held in the context.
 func (c *Context) Respond(res interface{}) error {
 	// preconditions
